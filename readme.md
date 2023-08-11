@@ -3,11 +3,11 @@ Used tools: VSCode + PlatformIO + ESP32.
 
 ## Sensors to fusion:
 
-Acelerometer
-Gyroscope
-Barometer
-Magnetometer
-GPS
-AirSpeed
-Optical-Flow
-RangeFinder
+* Acelerometer
+* Gyroscope
+* Barometer
+* Magnetometer
+* GPS
+* AirSpeed
+* Optical-Flow
+* RangeFinder
