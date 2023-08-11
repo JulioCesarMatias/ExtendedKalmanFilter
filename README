@@ -1,0 +1,11 @@
+An attempt to make the EKF work outside the Ardupilot algorithm. Used tools: VSCode + PlatformIO + ESP32.
+
+`Sensors:`
+
+Acelerometer + Gyroscope
+Barometer
+Magnetometer
+GPS
+AirSpeed
+Optical-Flow
+RangeFinder
