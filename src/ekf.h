@@ -10,13 +10,7 @@ extern float gForceX, gForceY, gForceZ;
 extern int32_t roll_sensor;
 extern int32_t pitch_sensor;
 extern int32_t yaw_sensor;
-
-typedef struct
-{
-    void *Pointer;
-}InfoStruct;
-
-extern void ekf_update(void);
+void ekf_update(void);
 
 typedef union
 {
