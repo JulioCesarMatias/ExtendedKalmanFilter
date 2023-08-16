@@ -1,6 +1,3 @@
-#include "AP_NavEKF.h"
-
-
 #include "ekf.h"
 #include <Wire.h>
 
@@ -21,12 +18,12 @@ void setup()
 
   Wire.beginTransmission(0x68); // I2C address of the MPU
   Wire.write(0x1B);             // Accessing the register 1B - Gyroscope Configuration (Sec. 4.4)
-  Wire.write(0x18);             // Setting the gyro to full scale +/- 250deg./s
+  Wire.write(0x18);             // Setting the gyro to full scale (2000 deg/sec)
   Wire.endTransmission();
 
   Wire.beginTransmission(0x68); // I2C address of the MPU
   Wire.write(0x1C);             // Accessing the register 1C - Acccelerometer Configuration (Sec. 4.5)
-  Wire.write(0x10);             // Setting the accel to +/- 2g
+  Wire.write(0x10);             // Setting the accel to +/- 8g
   Wire.endTransmission();
 }
 
@@ -72,13 +69,12 @@ void readGyroRegisters(void)
   rotZ = gyroZ / 131.0f;
 }
 
-
-
 void loop()
 {
   readAccelRegisters();
   readGyroRegisters();
 
   ekf_update();
-  delay(1);
+
+  delay(1); // 1KHz loop
 }
