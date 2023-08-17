@@ -104,41 +104,41 @@ typedef struct
 
 // This function is used to initialise the filter whilst moving, using the AHRS DCM solution
 // It should NOT be used to re-initialise after a timeout as DCM will also be corrupted
-bool InitialiseFilterDynamic(void);
+bool ekf_InitialiseFilterDynamic(void);
 
 // Initialise the states from accelerometer and magnetometer data (if present)
 // This method can only be used when the vehicle is static
-bool InitialiseFilterBootstrap(void);
+bool ekf_InitialiseFilterBootstrap(void);
 
 // Update Filter States - this should be called whenever new IMU data is available
-void UpdateFilter(void);
+void ekf_UpdateFilter(void);
 
 // Check basic filter health metrics and return a consolidated health status
-bool healthy(void);
+bool ekf_healthy(void);
 
 // Return the last calculated NED position relative to the reference point (m).
 // If a calculated solution is not available, use the best available data and return false
 // If false returned, do not use for flight control
-bool getPosNED(fpVector3_t *pos);
+bool ekf_getPosNED(fpVector3_t *pos);
 
 // return NED velocity in m/s
-void getVelNED(fpVector3_t *vel);
+void ekf_getVelNED(fpVector3_t *vel);
 
 // This returns the specific forces in the NED frame
-void getAccelNED(fpVector3_t *accelNED);
+void ekf_getAccelNED(fpVector3_t *accelNED);
 
 // return body axis gyro bias estimates in rad/sec
-void getGyroBias(fpVector3_t *gyroBias);
+void ekf_getGyroBias(fpVector3_t *gyroBias);
 
 // reset body axis gyro bias estimates
-void resetGyroBias(void);
+void ekf_resetGyroBias(void);
 
 // Resets the baro so that it reads zero at the current height
 // Resets the EKF height to zero
 // Adjusts the EKf origin height so that the EKF height + origin height is the same as before
 // Returns true if the height datum reset has been performed
 // If using a range finder for height no reset is performed and it returns false
-bool resetHeightDatum(void);
+bool ekf_resetHeightDatum(void);
 
 // Commands the EKF to not use GPS.
 // This command must be sent prior to arming as it will only be actioned when the filter is in static mode
@@ -146,30 +146,30 @@ bool resetHeightDatum(void);
 // Returns 0 if command rejected
 // Returns 1 if attitude, vertical velocity and vertical position will be provided
 // Returns 2 if attitude, 3D-velocity, vertical position and relative horizontal position will be provided
-uint8_t setInhibitGPS(void);
+uint8_t ekf_setInhibitGPS(void);
 
 // return the horizontal speed limit in m/s set by optical flow sensor limits
 // return the scale factor to be applied to navigation velocity gains to compensate for increase in velocity noise with height when using optical flow
-void getEkfControlLimits(float *ekfGndSpdLimit, float *ekfNavVelGainScaler);
+void ekf_getEkfControlLimits(float *ekfGndSpdLimit, float *ekfNavVelGainScaler);
 
 // return weighting of first IMU in blending function
-void getIMU1Weighting(float *ret);
+void ekf_getIMU1Weighting(float *ret);
 
 // return the individual Z-accel bias estimates in m/s^2
-void getAccelZBias(float *zbias1, float *zbias2);
+void ekf_getAccelZBias(float *zbias1, float *zbias2);
 
 // return the NED wind speed estimates in m/s (positive is air moving in the direction of the axis)
-void getWind(fpVector3_t *wind);
+void ekf_getWind(fpVector3_t *wind);
 
 // return earth magnetic field estimates in measurement units / 1000
-void getMagNED(fpVector3_t *magNED);
+void ekf_getMagNED(fpVector3_t *magNED);
 
 // return body magnetic field estimates in measurement units / 1000
-void getMagXYZ(fpVector3_t *magXYZ);
+void ekf_getMagXYZ(fpVector3_t *magXYZ);
 
 // Return estimated magnetometer offsets
 // Return true if magnetometer offsets are valid
-bool getMagOffsets(fpVector3_t *magOffsets);
+bool ekf_getMagOffsets(fpVector3_t *magOffsets);
 
 // return the latitude and longitude and height used to set the NED origin
 // All NED positions calculated by the filter are relative to this location
@@ -184,26 +184,26 @@ bool getMagOffsets(fpVector3_t *magOffsets);
 
 // return estimated height above ground level
 // return false if ground height is not being estimated.
-bool getHAGL(float *HAGL);
+bool ekf_getHAGL(float *HAGL);
 
 // return the Euler roll, pitch and yaw angle in radians
-void getEulerAngles(fpVector3_t *eulers);
+void ekf_getEulerAngles(fpVector3_t *eulers);
 
 // return the transformation matrix from XYZ (body) to NED axes
-void getRotationBodyToNED(fpMatrix3_t *mat);
+void ekf_getRotationBodyToNED(fpMatrix3_t *mat);
 
 // return the quaternions defining the rotation from NED to XYZ (body) axes
-void getQuaternion(fpQuaternion_t *quat);
+void ekf_getQuaternion(fpQuaternion_t *quat);
 
 // return the innovations for the NED Pos, NED Vel, XYZ Mag and Vtas measurements
-void getInnovations(fpVector3_t *velInnov, fpVector3_t *posInnov, fpVector3_t *magInnov, float *tasInnov);
+void ekf_getInnovations(fpVector3_t *velInnov, fpVector3_t *posInnov, fpVector3_t *magInnov, float *tasInnov);
 
 // return the innovation consistency test ratios for the velocity, position, magnetometer and true airspeed measurements
-void getVariances(float *velVar, float *posVar, float *hgtVar, fpVector3_t *magVar, float *tasVar, fpVector3_t *offset);
+void ekf_getVariances(float *velVar, float *posVar, float *hgtVar, fpVector3_t *magVar, float *tasVar, fpVector3_t *offset);
 
 // should we use the compass? This is public so it can be used for
-// reporting via ahrs.use_compass()
-bool use_compass(void);
+// reporting via ahrs.ekf_use_compass()
+bool ekf_use_compass(void);
 
 // write the raw optical flow measurements
 // rawFlowQuality is a measured of quality between 0 and 255, with 255 being the best quality
@@ -211,18 +211,15 @@ bool use_compass(void);
 // rawGyroRates are the sensor rotation rates in rad/sec measured by the sensors internal gyro
 // The sign convention is that a RH physical rotation of the sensor about an axis produces both a positive flow and gyro rate
 // msecFlowMeas is the scheduler time in msec when the optical flow data was received from the sensor.
-void writeOptFlowMeas(uint8_t *rawFlowQuality, fpVector3_t *rawFlowRates, fpVector3_t *rawGyroRates, uint32_t *msecFlowMeas);
-
-// return data for debugging optical flow fusion
-void getFlowDebug(float *varFlow, float *gndOffset, float *flowInnovX, float *flowInnovY, float *auxInnov, float *HAGL, float *rngInnov, float *range, float *gndOffsetErr);
+void ekf_writeOptFlowMeas(uint8_t *rawFlowQuality, fpVector3_t *rawFlowRates, fpVector3_t *rawGyroRates, uint32_t *msecFlowMeas);
 
 // called by vehicle code to specify that a takeoff is happening
 // causes the EKF to compensate for expected barometer errors due to ground effect
-void setTakeoffExpected(bool val);
+void ekf_setTakeoffExpected(bool val);
 
 // called by vehicle code to specify that a touchdown is expected to happen
 // causes the EKF to compensate for expected barometer errors due to ground effect
-void setTouchdownExpected(bool val);
+void ekf_setTouchdownExpected(bool val);
 
 /*
 return the filter fault status as a bitmasked integer
@@ -235,7 +232,7 @@ return the filter fault status as a bitmasked integer
  7 = badly conditioned synthetic sideslip fusion
  7 = filter is not initialised
 */
-void getFilterFaults(uint8_t *faults);
+void ekf_getFilterFaults(uint8_t *faults);
 
 /*
 return filter timeout status as a bitmasked integer
@@ -248,192 +245,177 @@ return filter timeout status as a bitmasked integer
  7 = unassigned
  7 = unassigned
 */
-void getFilterTimeouts(uint8_t *timeouts);
+void ekf_getFilterTimeouts(uint8_t *timeouts);
 
 /*
 return filter status flags
 */
-void getFilterStatus(nav_filter_status *status);
+void ekf_getFilterStatus(nav_filter_status *status);
 
 // provides the height limit to be observed by the control loops
 // returns false if no height limiting is required
 // this is needed to ensure the vehicle does not fly too high when using optical flow navigation
-bool getHeightControlLimit(float *height);
+bool ekf_getHeightControlLimit(float *height);
 
 // provides the quaternion that was used by the INS calculation to rotate from the previous orientation to the orientaion at the current time step
 // returns a zero rotation quaternion if the INS calculation was not performed on that time step.
-fpQuaternion_t getDeltaQuaternion(void);
+fpQuaternion_t ekf_getDeltaQuaternion(void);
 
 // return the amount of yaw angle change due to the last yaw angle reset in radians
 // returns true if a reset yaw angle has been updated and not queried
 // this function should not have more than one client
-bool getLastYawResetAngle(float *yawAng);
+bool ekf_getLastYawResetAngle(float *yawAng);
 
 // update the quaternion, velocity and position states using IMU measurements
-void UpdateStrapdownEquationsNED();
+void ekf_UpdateStrapdownEquationsNED(void);
 
 // calculate the predicted state covariance matrix
-void CovariancePrediction();
+void ekf_CovariancePrediction(void);
 
 // force symmetry on the state covariance matrix
-void ForceSymmetry();
+void ekf_ForceSymmetry(void);
 
 // copy covariances across from covariance prediction calculation and fix numerical errors
-void CopyAndFixCovariances();
+void ekf_CopyAndFixCovariances(void);
 
 // constrain variances (diagonal terms) in the state covariance matrix
-void ConstrainVariances();
+void ekf_ConstrainVariances(void);
 
 // constrain states
-void ConstrainStates();
+void ekf_ConstrainStates(void);
 
 // fuse selected position, velocity and height measurements
-void FuseVelPosNED();
+void ekf_FuseVelPosNED(void);
 
 // fuse magnetometer measurements
-void FuseMagnetometer();
+void ekf_FuseMagnetometer(void);
 
 // fuse true airspeed measurements
-void FuseAirspeed();
+void ekf_Fekf_useAirspeed(void);
 
 // fuse sythetic sideslip measurement of zero
-void FuseSideslip();
+void ekf_FuseSideslip(void);
 
 // zero specified range of rows in the state covariance matrix
-void zeroRows(float covMat[22][22], uint8_t first, uint8_t last);
+void ekf_zeroRows(float covMat[22][22], uint8_t first, uint8_t last);
 
 // zero specified range of columns in the state covariance matrix
-void zeroCols(float covMat[22][22], uint8_t first, uint8_t last);
+void ekf_zeroCols(float covMat[22][22], uint8_t first, uint8_t last);
 
 // store states along with system time stamp in msces
-void StoreStates(void);
+void ekf_StoreStates(void);
 
 // Reset the stored state history and store the current state
-void StoreStatesReset(void);
+void ekf_StoreStatesReset(void);
 
 // recall state vector stored at closest time to the one specified by msec
-void RecallStates(state_elements *statesForFusion, uint32_t msec);
+void ekf_RecallStates(state_elements *statesForFusion, uint32_t msec);
 
 // calculate the NED earth spin vector in rad/sec
-void calcEarthRateNED(fpVector3_t *omega, int32_t latitude);
+void ekf_calcEarthRateNED(fpVector3_t *omega, int32_t latitude);
 
 // calculate whether the flight vehicle is on the ground or flying from height, airspeed and GPS speed
-void SetFlightAndFusionModes();
+void ekf_SetFlightAndFusionModes(void);
 
 // initialise the covariance matrix
-void CovarianceInit();
+void ekf_CovarianceInit(void);
 
 // update IMU delta angle and delta velocity measurements
-void readIMUData();
+void ekf_readIMUData(void);
 
 // check for new valid GPS data and update stored measurement if available
-void readGpsData();
+void ekf_readGpsData(void);
 
 // check for new altitude measurement data and update stored measurement if available
-void readHgtData();
+void ekf_readHgtData(void);
 
 // check for new magnetometer data and update store measurements if available
-void readMagData();
+void ekf_readMagData(void);
 
 // check for new airspeed data and update stored measurements if available
-void readAirSpdData();
+void ekf_readAirSpdData(void);
 
 // determine when to perform fusion of GPS position and  velocity measurements
-void SelectVelPosFusion();
+void ekf_SelectVelPosFusion(void);
 
 // determine when to perform fusion of true airspeed measurements
-void SelectTasFusion();
+void ekf_SelectTasFusion(void);
 
 // determine when to perform fusion of synthetic sideslp measurements
-void SelectBetaFusion();
+void ekf_SelectBetaFusion(void);
 
 // determine when to perform fusion of magnetometer measurements
-void SelectMagFusion();
+void ekf_SelectMagFusion(void);
 
 // force alignment of the yaw angle using GPS velocity data
-void alignYawGPS();
+void ekf_alignYawGPS(void);
 
 // Forced alignment of the wind velocity states so that they are set to the reciprocal of
 // the ground speed and scaled to 6 m/s. This is used when launching a fly-forward vehicle without an airspeed sensor
 // on the assumption that launch will be into wind and 6 is representative global average at height
 // http://maps.google.com/gallery/details?id=zJuaSgXp_WLc.kTBytKPmNODY*hl=en
-void setWindVelStates();
+void ekf_setWindVelStates();
 
 // initialise the earth magnetic field states using declination and current attitude and magnetometer meaasurements
 // and return attitude quaternion
-fpQuaternion_t calcQuatAndFieldStates(float roll, float pitch);
+fpQuaternion_t ekf_calcQuatAndFieldStates(float roll, float pitch);
 
 // zero stored variables
-void InitialiseVariables();
+void ekf_InitialiseVariables(void);
 
 // reset the horizontal position states uing the last GPS measurement
-void ResetPosition(void);
+void ekf_ResetPosition(void);
 
 // reset velocity states using the last GPS measurement
-void ResetVelocity(void);
+void ekf_ResetVelocity(void);
 
 // reset the vertical position state using the last height measurement
-void ResetHeight(void);
+void ekf_ResetHeight(void);
 
 // return true if we should use the airspeed sensor
-bool useAirspeed(void);
+bool ekf_useAirspeed(void);
 
 // decay GPS horizontal position offset to close to zero at a rate of 1 m/s
 // this allows large GPS position jumps to be accomodated gradually
-void decayGpsOffset(void);
-
-// Check for filter divergence
-void checkDivergence(void);
-
-// Calculate weighting that is applied to IMU1 accel data to blend data from IMU's 1 and 2
-void calcIMU_Weighting(float K1, float K2);
+void ekf_decayGpsOffset(void);
 
 // return true if optical flow data is available
-bool optFlowDataPresent(void);
-
-// return true if we should use the range finder sensor
-bool useRngFinder(void);
+bool ekf_optFlowDataPresent(void);
 
 // determine when to perform fusion of optical flow measurements
-void SelectFlowFusion();
+void ekf_SelectFlowFusion();
 
 // recall omega (angular rate vector) average from time specified by msec to current time
 // this is useful for motion compensation of optical flow measurements
-void RecallOmega(fpVector3_t *omegaAvg, uint32_t msecStart, uint32_t msecEnd);
+void ekf_RecallOmega(fpVector3_t *omegaAvg, uint32_t msecStart, uint32_t msecEnd);
 
 // Estimate terrain offset using a single state EKF
-void EstimateTerrainOffset();
+void ekf_EstimateTerrainOffset(void);
 
 // fuse optical flow measurements into the main filter
-void FuseOptFlow();
+void ekf_FuseOptFlow(void);
 
 // Check arm status and perform required checks and mode changes
-void performArmingChecks();
+void ekf_performArmingChecks(void);
 
 // Set the NED origin to be used until the next filter reset
-void setOrigin();
+void ekf_setOrigin(void);
 
 // determine if a takeoff is expected so that we can compensate for expected barometer errors due to ground effect
-bool getTakeoffExpected();
+bool ekf_getTakeoffExpected(void);
 
 // determine if a touchdown is expected so that we can compensate for expected barometer errors due to ground effect
-bool getTouchdownExpected();
+bool ekf_getTouchdownExpected();
 
 // Assess GPS data quality and return true if good enough to align the EKF
-bool calcGpsGoodToAlign(void);
+bool ekf_calcGpsGoodToAlign(void);
 
 // Read the range finder and take new measurements if available
 // Apply a median filter to range finder data
-void readRangeFinder();
+void ekf_readRangeFinder(void);
 
 // check if the vehicle has taken off during optical flow navigation by looking at inertial and range finder data
-void detectOptFlowTakeoff(void);
+void ekf_detectOptFlowTakeoff(void);
 
 // align the NE earth magnetic field states with the published declination
-void alignMagStateDeclination();
-
-// should we assume zero sideslip?
-bool assume_zero_sideslip(void);
-
-// vehicle specific initial gyro bias uncertainty
-float InitialGyroBiasUncertainty(void);
+void ekf_alignMagStateDeclination(void);
