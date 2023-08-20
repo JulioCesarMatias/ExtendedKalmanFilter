@@ -11,7 +11,7 @@ void setup()
 
   Wire.begin();
 
-  Wire.beginTransmission(0x68); // This is the I2C address of the MPU (b1101000/b1101001 for AC0 low/high datasheet sec. 9.2)
+  Wire.beginTransmission(0x68); // This is the I2C address of the MPU (0x68/0x69 for AC0 low/high datasheet sec. 9.2)
   Wire.write(0x6B);             // Accessing the register 6B - Power Management (Sec. 4.28)
   Wire.write(0x03);             // Setting SLEEP register to 0. (Required; see Note on p. 9)
   Wire.endTransmission();
@@ -39,13 +39,13 @@ void readAccelRegisters(void)
   {
   }
 
-  accelX = (Wire.read() << 8) | Wire.read(); // Store first two bytes into accelX
-  accelY = (Wire.read() << 8) | Wire.read(); // Store middle two bytes into accelY
-  accelZ = (Wire.read() << 8) | Wire.read(); // Store last two bytes into accelZ
+  accelX = (Wire.read() << 8) | Wire.read(); // Store first two bytes
+  accelY = (Wire.read() << 8) | Wire.read(); // Store middle two bytes
+  accelZ = (Wire.read() << 8) | Wire.read(); // Store last two bytes
 
-  gForceX = accelX / 16384.0f;
-  gForceY = accelY / 16384.0f;
-  gForceZ = accelZ / 16384.0f;
+  gForceX = (accelX / 16384.0f) * GRAVITY_MSS * 0.001f;
+  gForceY = (accelY / 16384.0f) * GRAVITY_MSS * 0.001f;
+  gForceZ = (accelZ / 16384.0f) * GRAVITY_MSS * 0.001f;
 }
 
 void readGyroRegisters(void)
@@ -60,9 +60,9 @@ void readGyroRegisters(void)
   {
   }
 
-  gyroX = (Wire.read() << 8) | Wire.read(); // Store first two bytes into accelX
-  gyroY = (Wire.read() << 8) | Wire.read(); // Store middle two bytes into accelY
-  gyroZ = (Wire.read() << 8) | Wire.read(); // Store last two bytes into accelZ
+  gyroX = (Wire.read() << 8) | Wire.read(); // Store first two bytes
+  gyroY = (Wire.read() << 8) | Wire.read(); // Store middle two bytes
+  gyroZ = (Wire.read() << 8) | Wire.read(); // Store last two bytes
 
   rotX = gyroX / 131.0f;
   rotY = gyroY / 131.0f;

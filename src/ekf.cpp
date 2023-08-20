@@ -553,20 +553,6 @@ bool ekf_useAirspeed(void)
     return false;
 }
 
-// return true if optical flow data is available
-bool ekf_optFlowDataPresent(void)
-{
-    if (imuSampleTime_ms - flowMeaTime_ms < 5000)
-    {
-        return true;
-    }
-    else
-    {
-        return false;
-    }
-    return false;
-}
-
 // return true if we should use the compass
 bool ekf_use_compass(void)
 {
@@ -574,14 +560,10 @@ bool ekf_use_compass(void)
     return false;
 }
 
-/*
-  should we assume zero sideslip?
- */
+// should we assume zero sideslip?
 bool ekf_assume_zero_sideslip(void)
 {
-    // we don't assume zero sideslip for ground vehicles as EKF could
-    // be quite sensitive to a rapid spin of the ground vehicle if
-    // traction is lost
+    // we don't assume zero sideslip for ground vehicles as EKF could be quite sensitive to a rapid spin of the ground vehicle if traction is lost
     // return _ahrs->get_fly_forward() && _ahrs->get_vehicle_class() != AHRS_VEHICLE_GROUND;
     return true;
 }
@@ -625,8 +607,7 @@ bool ekf_healthy(void)
 
     if (velTestRatio > 1 && posTestRatio > 1 && hgtTestRatio > 1)
     {
-        // all three metrics being above 1 means the filter is
-        // extremely unhealthy.
+        // all three metrics being above 1 means the filter is extremely unhealthy.
         return false;
     }
 
@@ -711,15 +692,18 @@ void ekf_ResetHeight(void)
 {
     // read the altimeter
     ekf_readHgtData();
+
     // write to the state vector
     state->position.z = -hgtMea; // down position from blended accel data
     state->posD1 = -hgtMea;      // down position from IMU1 accel data
     state->posD2 = -hgtMea;      // down position from IMU2 accel data
+
     // reset stored vertical position states to prevent subsequent GPS measurements from being rejected
     for (uint8_t i = 0; i <= 49; i++)
     {
         storedStates[i].position.z = -hgtMea;
     }
+
     terrainState = state->position.z + rngOnGnd;
 }
 
@@ -993,7 +977,6 @@ void ekf_SelectVelPosFusion(void)
     // Specify which measurements should be used and check data for freshness
     if (PV_AidingMode == AID_ABSOLUTE)
     {
-
         // check if we can use opticalflow as a backup
         bool optFlowBackup = (flowDataValid && !hgtTimeout);
 
@@ -4520,6 +4503,17 @@ bool ekf_resetHeightDatum(void)
     return true;
 }
 
+// return true if optical flow data is available
+bool ekf_optFlowDataPresent(void)
+{
+    if (imuSampleTime_ms - flowMeaTime_ms < 5000)
+    {
+        return true;
+    }
+
+    return false;
+}
+
 // Commands the EKF to not use GPS.
 // This command must be sent prior to arming
 // This command is forgotten by the EKF each time the vehicle disarms
@@ -4816,18 +4810,36 @@ void ekf_CopyAndFixCovariances(void)
 void ekf_ConstrainVariances(void)
 {
     for (uint8_t i = 0; i <= 3; i++)
+    {
         P[i][i] = constrainf(P[i][i], 0.0f, 1.0f); // quaternions
+    }
+
     for (uint8_t i = 4; i <= 6; i++)
+    {
         P[i][i] = constrainf(P[i][i], 0.0f, 1.0e3f); // velocities
+    }
+
     for (uint8_t i = 7; i <= 9; i++)
+    {
         P[i][i] = constrainf(P[i][i], 0.0f, 1.0e6f); // positions
+    }
+
     for (uint8_t i = 10; i <= 12; i++)
+    {
         P[i][i] = constrainf(P[i][i], 0.0f, sq(0.175f * dtIMUavg)); // delta angle biases
-    P[13][13] = constrainf(P[13][13], 0.0f, sq(10.0f * dtIMUavg));  // delta velocity bias
+    }
+
+    P[13][13] = constrainf(P[13][13], 0.0f, sq(10.0f * dtIMUavg)); // delta velocity bias
+
     for (uint8_t i = 14; i <= 15; i++)
+    {
         P[i][i] = constrainf(P[i][i], 0.0f, 1.0e3f); // earth magnetic field
+    }
+
     for (uint8_t i = 16; i <= 21; i++)
+    {
         P[i][i] = constrainf(P[i][i], 0.0f, 1.0f); // body magnetic field
+    }
 }
 
 // constrain states to prevent ill-conditioning
@@ -4835,30 +4847,53 @@ void ekf_ConstrainStates(void)
 {
     // quaternions are limited between +-1
     for (uint8_t i = 0; i <= 3; i++)
+    {
         states[i] = constrainf(states[i], -1.0f, 1.0f);
+    }
+
     // velocity limit 500 m/sec (could set this based on some multiple of max airspeed * EAS2TAS)
     for (uint8_t i = 4; i <= 6; i++)
+    {
         states[i] = constrainf(states[i], -5.0e2f, 5.0e2f);
+    }
+
     // position limit 1000 km - TODO apply circular limit
     for (uint8_t i = 7; i <= 8; i++)
+    {
         states[i] = constrainf(states[i], -1.0e6f, 1.0e6f);
+    }
+
     // height limit covers home alt on everest through to home alt at SL and ballon drop
     state->position.z = constrainf(state->position.z, -4.0e4f, 1.0e4f);
+
     // gyro bias limit ~6 deg/sec (this needs to be set based on manufacturers specs)
     for (uint8_t i = 10; i <= 12; i++)
+    {
         states[i] = constrainf(states[i], -0.1f * dtIMUavg, 0.1f * dtIMUavg);
+    }
+
     // Z accel bias limit 1.0 m/s^2	(this needs to be finalised from test data)
     states[13] = constrainf(states[13], -1.0f * dtIMUavg, 1.0f * dtIMUavg);
     states[22] = constrainf(states[22], -1.0f * dtIMUavg, 1.0f * dtIMUavg);
+
     // wind velocity limit 100 m/s (could be based on some multiple of max airspeed * EAS2TAS) - TODO apply circular limit
     for (uint8_t i = 14; i <= 15; i++)
+    {
         states[i] = constrainf(states[i], -100.0f, 100.0f);
+    }
+
     // earth magnetic field limit
     for (uint8_t i = 16; i <= 18; i++)
+    {
         states[i] = constrainf(states[i], -1.0f, 1.0f);
+    }
+
     // body magnetic field limit
     for (uint8_t i = 19; i <= 21; i++)
+    {
         states[i] = constrainf(states[i], -0.5f, 0.5f);
+    }
+
     // constrain the terrain offset state
     terrainState = MAX(terrainState, state->position.z + rngOnGnd);
 }
@@ -6287,18 +6322,17 @@ void ekf_update(void)
             // Inertial Navigation is NEU
             _relpos_cm.z = -_relpos_cm.z;
             _velocity_cm.z = -_velocity_cm.z;
-
-            Serial.print(_relpos_cm.z);
-            Serial.print(" ");
-            Serial.println(_velocity_cm.z);
-
             /*
+                        Serial.print(_relpos_cm.z);
+                        Serial.print(" ");
+                        Serial.println(_velocity_cm.z);
+            */
+
             Serial.print(roll_sensor);
             Serial.print(" ");
             Serial.print(pitch_sensor);
             Serial.print(" ");
             Serial.println(yaw_sensor);
-            */
 
             // keep _gyro_bias for get_gyro_drift()
             /*EKF.ekf_getGyroBias(_gyro_bias);
