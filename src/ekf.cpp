@@ -1,5 +1,7 @@
 #include "ekf.h"
 
+#define SAVE_RAM_STM32F1 // decay the RAM to 87% in STM32F1 for IMU tests
+
 #define MULTIROTOR
 
 #ifdef MULTIROTOR
@@ -460,33 +462,6 @@ float _maxFlowRate = 2.5f;
 // @Values: 0:Use Baro, 1:Use Range Finder
 float _altSource = 1;
 
-// copied from https://code.google.com/p/cxutil/source/browse/include/cxutil/utility.h#70
-#define _CHOOSE2(binoper, lexpr, lvar, rexpr, rvar) \
-    (__extension__({                                \
-        __typeof__(lexpr) lvar = (lexpr);           \
-        __typeof__(rexpr) rvar = (rexpr);           \
-        lvar binoper rvar ? lvar : rvar;            \
-    }))
-#define _CHOOSE_VAR2(prefix, unique) prefix##unique
-#define _CHOOSE_VAR(prefix, unique) _CHOOSE_VAR2(prefix, unique)
-#define _CHOOSE(binoper, lexpr, rexpr)          \
-    _CHOOSE2(                                   \
-        binoper,                                \
-        lexpr, _CHOOSE_VAR(_left, __COUNTER__), \
-        rexpr, _CHOOSE_VAR(_right, __COUNTER__))
-#define MIN(a, b) _CHOOSE(<, a, b)
-#define MAX(a, b) _CHOOSE(>, a, b)
-
-float constrainf(float amt, float low, float high)
-{
-    if (amt < low)
-        return low;
-    else if (amt > high)
-        return high;
-    else
-        return amt;
-}
-
 float wrap_2PI(const float radian)
 {
     float res = fmodf(radian, (3.141592653589793 * 2));
@@ -507,26 +482,9 @@ float wrap_PI(const float radian)
     return res;
 }
 
-// function to calculate the normalization (pythagoras) of a 2-dimensional vector
-float calc_length_pythagorean_2D(const float firstElement, const float secondElement)
-{
-    return sqrtf(sq(firstElement) + sq(secondElement));
-}
-
-// function to calculate the normalization (pythagoras) of a 3-dimensional vector
-float calc_length_pythagorean_3D(const float firstElement, const float secondElement, const float thirdElement)
-{
-    return sqrtf(sq(firstElement) + sq(secondElement) + sq(thirdElement));
-}
-
 static float getLooptime(void)
 {
-    return 1000.0f; // 1KHz loop
-}
-
-float get_delta_time(void)
-{
-    return getLooptime() * 1e-6f; // real time of IMU
+    return 1000.0f;
 }
 
 // airplane or multirotor enabled?
@@ -535,15 +493,16 @@ bool getAirplaneEnabled(void)
     return false;
 }
 
+bool manual_arm = false;
 // return true if the vehicle is requesting the filter to be ready for flight
 static bool getVehicleArmStatus(void)
 {
-    return true;
+    return manual_arm;
 }
 
 static bool isGPSTrustworthy(void)
 {
-    return true;
+    return false;
 }
 
 // return true if we should use the airspeed sensor
@@ -565,7 +524,7 @@ bool ekf_assume_zero_sideslip(void)
 {
     // we don't assume zero sideslip for ground vehicles as EKF could be quite sensitive to a rapid spin of the ground vehicle if traction is lost
     // return _ahrs->get_fly_forward() && _ahrs->get_vehicle_class() != AHRS_VEHICLE_GROUND;
-    return true;
+    return false;
 }
 
 float get_EAS2TAS(void)
@@ -575,17 +534,17 @@ float get_EAS2TAS(void)
 
 float ahrs_roll(void)
 {
-    return 0.0f;
+    return 0.17f;
 }
 
 float ahrs_pitch(void)
 {
-    return 0.0f;
+    return 0.17f;
 }
 
 float get_home_lat(void)
 {
-    return 3654892;
+    return 0;
 }
 
 float _baro_get_altitude(void)
@@ -810,7 +769,7 @@ bool ekf_InitialiseFilterBootstrap(void)
     magUpdateCountMax = 1.0f / magUpdateCountMaxInv;
 
     // acceleration vector in XYZ body axes measured by the IMU (m/s^2)
-    fpVector3_t initAccVec;
+    fpVector3_t initAccVec = {.v = {10, 10, 10}};
 
     // TODO we should average accel readings over several cycles
     // initAccVec = _ahrs->get_ins().get_accel();
@@ -842,7 +801,10 @@ bool ekf_InitialiseFilterBootstrap(void)
     ekf_SetFlightAndFusionModes();
 
     // write to state vector
-    state->quat = initQuat;
+    state->quat.q0 = initQuat.q0;
+    state->quat.q1 = initQuat.q1;
+    state->quat.q2 = initQuat.q2;
+    state->quat.q3 = initQuat.q3;
     state->gyro_bias.x = 0.0f;
     state->gyro_bias.y = 0.0f;
     state->gyro_bias.z = 0.0f;
@@ -960,12 +922,15 @@ void ekf_UpdateFilter(void)
     // Read range finder data which is used by both position and optical flow fusion
     ekf_readRangeFinder();
 
+#ifndef SAVE_RAM_STM32F1
     // Update states using GPS, altimeter, compass, airspeed and synthetic sideslip observations
     ekf_SelectVelPosFusion();
-    ekf_SelectMagFusion();
-    ekf_SelectFlowFusion();
-    ekf_SelectTasFusion();
-    ekf_SelectBetaFusion();
+
+// ekf_SelectMagFusion();
+// ekf_SelectFlowFusion();
+// ekf_SelectTasFusion();
+// ekf_SelectBetaFusion();
+#endif
 }
 
 // select fusion of velocity, position and height measurements
@@ -4898,17 +4863,18 @@ void ekf_ConstrainStates(void)
     terrainState = MAX(terrainState, state->position.z + rngOnGnd);
 }
 
-float rotX, rotY, rotZ;
-float gForceX, gForceY, gForceZ;
+fpVector3_t gyroData;
+fpVector3_t accData;
+float accUpdate;
 
 // read the delta velocity and corresponding time interval from the IMU
 void readDeltaVelocity(fpVector3_t *dVel, float *dVel_dt)
 {
-    dVel->x = gForceX;
-    dVel->y = gForceY;
-    dVel->z = gForceZ;
+    dVel->x = accData.x;
+    dVel->y = accData.y;
+    dVel->z = accData.z;
 
-    float dVel_dtF = getLooptime() * 1e-6f;
+    float dVel_dtF = accUpdate;
 
     *dVel_dt = dVel_dtF;
 }
@@ -4916,16 +4882,16 @@ void readDeltaVelocity(fpVector3_t *dVel, float *dVel_dt)
 // read the delta angle and corresponding time interval from the IMU
 void readDeltaAngle(fpVector3_t *dAng)
 {
-    dAng->x = rotX;
-    dAng->y = rotY;
-    dAng->z = rotZ;
+    dAng->x = gyroData.x;
+    dAng->y = gyroData.y;
+    dAng->z = gyroData.z;
 }
 
 // update IMU delta angle and delta velocity measurements
 void ekf_readIMUData(void)
 {
     dtIMUavg = getLooptime() * 1e-6f;
-    dtIMUactual = MAX(get_delta_time(), 1.0e-4f);
+    dtIMUactual = MAX(accUpdate, 1.0e-4f);
 
     imuSampleTime_ms = millis();
 
@@ -5515,8 +5481,8 @@ void ekf_InitialiseVariables(void)
     firstMagYawInit = false;
     secondMagYawInit = false;
     storeIndex = 0;
-    dtIMUavg = 0.0025f;
-    dtIMUactual = 0.0025f;
+    dtIMUavg = 0.0f;
+    dtIMUactual = 0.0f;
     dt = 0;
     hgtMea = 0;
     storeIndex = 0;
@@ -5544,10 +5510,7 @@ void ekf_InitialiseVariables(void)
     gpsPosNE.x = 0.0f;
     gpsPosNE.y = 0.0f;
     gpsPosNE.z = 0.0f;
-    prevTnb.m[0][0] = prevTnb.m[1][1] = prevTnb.m[2][2] = 0.0f;
-    prevTnb.m[0][1] = prevTnb.m[0][2] = 0.0f;
-    prevTnb.m[1][0] = prevTnb.m[1][2] = 0.0f;
-    prevTnb.m[2][0] = prevTnb.m[2][1] = 0.0f;
+    matrixIdentity(&prevTnb);
     memset(&P[0][0], 0, sizeof(P));
     memset(&nextP[0][0], 0, sizeof(nextP));
     memset(&processNoise[0], 0, sizeof(processNoise));
@@ -5557,6 +5520,7 @@ void ekf_InitialiseVariables(void)
     memset(&hgtIncrStateDelta[0], 0, sizeof(hgtIncrStateDelta));
     memset(&magIncrStateDelta[0], 0, sizeof(magIncrStateDelta));
     memset(&flowIncrStateDelta[0], 0, sizeof(flowIncrStateDelta));
+    memset(&faultStatus, 0, sizeof(faultStatus));
     newDataFlow = false;
     flowDataValid = false;
     newDataRng = false;
@@ -5582,9 +5546,8 @@ void ekf_InitialiseVariables(void)
     vehicleArmed = false;
     prevVehicleArmed = false;
     constPosMode = true;
-    memset(&faultStatus, 0, sizeof(faultStatus));
     hgtRate = 0.0f;
-    mag_state.q0 = 1;
+    mag_state.q0 = 1.0f;
     mag_state.DCM[0][0] = mag_state.DCM[1][1] = mag_state.DCM[2][2] = 1.0f;
     mag_state.DCM[0][1] = mag_state.DCM[0][2] = 0.0f;
     mag_state.DCM[1][0] = mag_state.DCM[1][2] = 0.0f;
@@ -5665,6 +5628,26 @@ return the filter fault status as a bitmasked integer
 */
 void ekf_getFilterFaults(uint8_t *faults)
 {
+    /*uint32_t now = millis();
+    static uint32_t _last_serial_ms;
+
+    if (now - _last_serial_ms >= 10)
+    {
+        Serial.print("dtIMUavg:");
+        Serial.print(dtIMUavg * 1000000);
+        Serial.print(" dtIMUactual:");
+        Serial.print(dtIMUactual * 1000000);
+        Serial.print(" q0:");
+        Serial.print(state->quat.q0);
+        Serial.print(" q1:");
+        Serial.print(state->quat.q1);
+        Serial.print(" q2:");
+        Serial.print(state->quat.q2);
+        Serial.print(" q3:");
+        Serial.println(state->quat.q3);
+        _last_serial_ms = now;
+    }*/
+
     *faults = ((isnan(state->quat.q0) || isnan(state->quat.q1) || isnan(state->quat.q2) || isnan(state->quat.q3)) << 0 |
                (isnan(state->velocity.x) || isnan(state->velocity.y) || isnan(state->velocity.z)) << 1 |
                faultStatus.bad_xmag << 2 |
@@ -5738,8 +5721,23 @@ void ekf_getFilterStatus(nav_filter_status *status)
     status->flags.using_gps = (imuSampleTime_ms - lastPosPassTime) < 4000;
 }
 
-// send an EKF_STATUS message to GCS
-/*void send_status_report(void)
+typedef enum EKF_STATUS_FLAGS
+{
+    EKF_ATTITUDE = 1,                /* set if EKF's attitude estimate is good | */
+    EKF_VELOCITY_HORIZ = 2,          /* set if EKF's horizontal velocity estimate is good | */
+    EKF_VELOCITY_VERT = 4,           /* set if EKF's vertical velocity estimate is good | */
+    EKF_POS_HORIZ_REL = 8,           /* set if EKF's horizontal position (relative) estimate is good | */
+    EKF_POS_HORIZ_ABS = 16,          /* set if EKF's horizontal position (absolute) estimate is good | */
+    EKF_POS_VERT_ABS = 32,           /* set if EKF's vertical position (absolute) estimate is good | */
+    EKF_POS_VERT_AGL = 64,           /* set if EKF's vertical position (above ground) estimate is good | */
+    EKF_CONST_POS_MODE = 128,        /* EKF is in constant position mode and does not know it's absolute or relative position | */
+    EKF_PRED_POS_HORIZ_REL = 256,    /* set if EKF's predicted horizontal position (relative) estimate is good | */
+    EKF_PRED_POS_HORIZ_ABS = 512,    /* set if EKF's predicted horizontal position (absolute) estimate is good | */
+    EKF_STATUS_FLAGS_ENUM_END = 513, /*  | */
+} EKF_STATUS_FLAGS;
+
+// send an EKF_STATUS message
+void send_status_report(void)
 {
     // get filter status
     nav_filter_status filt_state;
@@ -5802,11 +5800,20 @@ void ekf_getFilterStatus(nav_filter_status *status)
     float velVar, posVar, hgtVar, tasVar;
     fpVector3_t magVar;
     fpVector3_t offset;
-    ekf_getVariances(velVar, posVar, hgtVar, magVar, tasVar, offset);
+    ekf_getVariances(&velVar, &posVar, &hgtVar, &magVar, &tasVar, &offset);
 
-    // send message
-    mavlink_msg_ekf_status_report_send(chan, flags, velVar, posVar, hgtVar, magVar.length(), tasVar);
-}*/
+    /*Serial.print(flags);
+    Serial.print(" ");
+    Serial.print(velVar);
+    Serial.print(" ");
+    Serial.print(posVar);
+    Serial.print(" ");
+    Serial.print(hgtVar);
+    Serial.print(" ");
+    Serial.print(calc_length_pythagorean_3D(magVar.x, magVar.y, magVar.z));
+    Serial.print(" ");
+    Serial.println(tasVar);*/
+}
 
 // Check arm status and perform required checks and mode changes
 void ekf_performArmingChecks(void)
@@ -6263,10 +6270,18 @@ int32_t yaw_sensor;
 
 uint32_t start_time_ms;
 
+bool system_using_EKF(void)
+{
+    // If EKF is started we switch away if it reports unhealthy. This could be due to bad
+    // sensor data. If EKF reversion is inhibited, we only switch across if the EKF encounters
+    // an internal processing error, but not for bad sensor data.
+    bool ret = ekf_started && ekf_healthy();
+
+    return ret;
+}
+
 void ekf_update(void)
 {
-    // AP_AHRS_DCM::update();
-
     if (!ekf_started)
     {
         // wait 1 second for DCM to output a valid tilt error estimate
@@ -6276,17 +6291,23 @@ void ekf_update(void)
         }
         if (millis() - start_time_ms > 1000)
         {
+            matrixIdentity(&_dcm_matrix);
             ekf_started = ekf_InitialiseFilterDynamic();
         }
     }
 
     if (ekf_started)
     {
-
         ekf_UpdateFilter();
         ekf_getRotationBodyToNED(&_dcm_matrix);
+        send_status_report();
 
-        // if (using_EKF())
+        if (millis() - start_time_ms > 5000)
+        {
+            //manual_arm = true;
+        }
+
+        if (system_using_EKF())
         {
 
             fpVector3_t eulers;
@@ -6297,13 +6318,13 @@ void ekf_update(void)
             pitch = eulers.y;
             yaw = eulers.z;
 
-            roll_sensor = degrees(roll) * 100;
-            pitch_sensor = degrees(pitch) * 100;
-            yaw_sensor = degrees(yaw) * 100;
+            roll_sensor = degrees(roll) * 10;
+            pitch_sensor = degrees(pitch) * 10;
+            yaw_sensor = degrees(yaw) * 10;
 
             if (yaw_sensor < 0)
             {
-                yaw_sensor += 36000;
+                yaw_sensor += 3600;
             }
 
             fpVector3_t _relpos_cm;   // NEU

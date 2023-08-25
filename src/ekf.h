@@ -5,11 +5,9 @@
 // acceleration due to gravity in m/s/s
 #define GRAVITY_MSS 9.80665f
 
-extern float rotX, rotY, rotZ;
-extern float gForceX, gForceY, gForceZ;
-extern int32_t roll_sensor;
-extern int32_t pitch_sensor;
-extern int32_t yaw_sensor;
+extern fpVector3_t gyroData;
+extern fpVector3_t accData;
+extern float accUpdate;
 void ekf_update(void);
 
 typedef union

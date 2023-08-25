@@ -115,6 +115,22 @@ void quaternion_to_euler(fpQuaternion_t q, float *roll, float *pitch, float *yaw
   *yaw = atan2f(2.0f * (q.q0 * q.q3 + q.q1 * q.q2), 1.0f - 2.0f * (q.q2 * q.q2 + q.q3 * q.q3));
 }
 
+void matrixIdentity(fpMatrix3_t *m)
+{
+    // A
+    m->m[0][0] = 1.0f;
+    m->m[0][1] = 0.0f;
+    m->m[0][2] = 0.0f;
+    // B
+    m->m[1][0] = 0.0f;
+    m->m[1][1] = 1.0f;
+    m->m[1][2] = 0.0f;
+    // C
+    m->m[2][0] = 0.0f;
+    m->m[2][1] = 0.0f;
+    m->m[2][2] = 1.0f;
+}
+
 void matrix_from_euler(fpMatrix3_t *m, float roll, float pitch, float yaw)
 {
   const float cp = cos(pitch);

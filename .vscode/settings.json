@@ -1,5 +1,11 @@
 {
     "files.associations": {
-        "cmath": "cpp"
-    }
+        "cmath": "cpp",
+        "typeinfo": "cpp"
+    },
+    "cmake.sourceDirectory": "/Users/juliocesarmatias/Documents/ExtendedKalmanFilter/.pio/libdeps/esp32dev/Unity",
+    "[python]": {
+        "editor.defaultFormatter": "ms-python.autopep8"
+    },
+    "python.formatting.provider": "none"
 }
